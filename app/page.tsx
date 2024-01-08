@@ -1,113 +1,102 @@
 import Image from 'next/image'
+import Link from 'next/link'
+import { groq } from "next-sanity"
+import { client } from '../sanity/lib/client'
+import { urlForImage } from '../sanity/lib/image'
+import { PostBase, Category } from '../config/typings'
+import { PostFilters } from './components/postFilters'
+import { ProductSort } from './components/postSort'
+import Banner from './components/banner'
+import ContactForm from './components/contact'
 
-export default function Home() {
+interface Props {
+  searchParams: {
+    date?: "string",
+    category?: "string",
+  }
+}
+
+export default async function Home({ searchParams }: Props) {
+  const { date='desc', category } = searchParams
+
+  const postFilter = `_type == 'post'`
+  const categoryFilter = category ? `&& "${category}" in categories` : ""
+  const filter = `*[${postFilter} ${categoryFilter}]`
+  const dateOrder = date 
+    ? `| order(_createdAt ${date})`
+    : ''
+
+
+  const posts = await client.fetch<PostBase[]>(
+    groq`${filter} ${dateOrder} {
+      _id,
+      title,
+      description,
+      mainImage,
+      slug,
+      categories,
+      author -> {
+        name,
+        image
+      }
+    }`, { next: { revalidate: 1000 } }
+  )
+
+  console.log(posts)
+
+  const categories = await client.fetch<Category[]>(
+    groq`*[_type == 'category']{
+      _id,
+      title,
+      description,
+    }`
+  )
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <>
+    <div className='max-w-7xl mx-auto'>
+      <Banner />
+    </div>
+    <div className='max-w-7xl mx-auto flex mt-24'>
+      <div className='w-[70%] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 p-2 md:p-6'>
+        {posts.map((item) => (
+          <Link
+            key={item._id}
+            href={`/post/${item.slug.current}`}
           >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+            <div className='border border-[#CCFF66] rounded-lg group cursor-pointer overflow-hidden'>
+              <img
+                className='h-60 w-full object-cover group-hover:scale-105 transition-transform duration-200 ease-in-out'
+                src={urlForImage(item?.mainImage).url()}
+                alt="alt"
+              />
+
+              <div className='flex justify-between p-5 bg-[#2EC4B6]'>
+                <div>
+                  <p className='text-lg font-bold'>{item.title}</p>
+                  <p className='text-xs text-[#CCFF66]'>{item._description} by {item.author.name}</p>
+                </div>
+
+                <img
+                  className='h-12 w-12 rounded-full'
+                  src={urlForImage(item.author.image).url()}
+                  alt=''
+                />
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <div className="w-[30%] mt-6">
+        <div>
+          <ProductSort />
+          <PostFilters categories={categories}/>
         </div>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </div>
+    <div className='mt-24'>
+      <ContactForm />
+    </div>
+    </>
   )
 }
